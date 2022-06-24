@@ -1,23 +1,20 @@
-import logo from './logo.svg';
+import React, { useState, useEffect } from 'react';
 import './App.css';
+import GoogleAuth from './steps/one-google-auth/GoogleAuth';
+import PdfUpload from './steps/two-pdf-upload/PdfUpload';
+import PdfParsing from './steps/three-pdf-parsing/PdfParsing';
 
-function App() {
+const App = () => {
+  const [currentStep, setCurrentStep] = useState(1); // this is weird
+  const isAuthenticated = currentStep === 1;
+  const hasPdfs = currentStep === 2;
+  const isProcessingPdfs = currentStep === 3;
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      {isAuthenticated && <GoogleAuth/>}
+      {hasPdfs && <PdfUpload/>}
+      {isProcessingPdfs && <PdfParsing/>}
     </div>
   );
 }
