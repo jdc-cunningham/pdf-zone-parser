@@ -6,6 +6,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+// strict mode renders components twice, eg. double console log for no arg useEffect
 root.render(
   <React.StrictMode>
     <App />

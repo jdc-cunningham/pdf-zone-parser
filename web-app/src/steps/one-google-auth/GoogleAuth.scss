@@ -1,0 +1,38 @@
+.App__google-auth {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  width: 100%;
+  max-width: 800px;
+  height: 100vh;
+
+  h2 {
+    margin-top: 1rem;
+  }
+
+  img {
+    margin-top: 1rem;
+  }
+
+  input {
+    font-size: 1.5rem;
+    margin-top: 1rem;
+    padding: 0.5rem;
+  }
+
+  button {
+    margin-top: 1rem;
+    background-color: blue;
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    color: white;
+    border: 0;
+    transition: all ease-in-out 0.3s;
+    cursor: pointer;
+  }
+
+  button:hover {
+    transform: scale(1.1);
+  }
+}
