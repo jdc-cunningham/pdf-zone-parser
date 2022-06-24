@@ -1,0 +1,37 @@
+These commands are ran in a CLI
+
+// Create database
+CREATE DATABASE pdf_parser;
+
+// create tables
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_name` varchar(50),
+  `spreadsheet_id` varchar(255),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+CREATE TABLE `util` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `gsa_email` varchar(255),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+// used for status
+CREATE TABLE `pdf_uploads` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11),
+  `file_name` varchar(255),
+  `parsed` boolean,
+  `upload_date` datetime,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+// the mapping is with regard to cell coordinates and parsed values
+CREATE TABLE `pdf_parsed_data` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11),
+  `pdf_id` int(11),
+  `pdf_data_mapping` JSON,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
