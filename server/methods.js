@@ -254,7 +254,7 @@ const _generateScreenshots = async (pdfUrl, zones) => {
 
 }
 
-const _parsePdfPartialScreenshot = async (pdfScreenshotImage) => {
+const _parsePdfPartialScreenshot = async () => {
   await worker.load();
   await worker.loadLanguage('eng');
   await worker.initialize('eng');
@@ -263,8 +263,24 @@ const _parsePdfPartialScreenshot = async (pdfScreenshotImage) => {
   await worker.terminate();
 }
 
+const _processPdfs = async (reqBody) => {
+  const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
+
+  // need to work out this flow
+}
+
 const parsePdfZones = async (req, res) => {
-  
+  const processingFinished = await _processPdfs(req.Body);
+
+  if (processingFinished) {
+    res.status(200).json({
+      ok: true
+    });
+  } else {
+    res.status(400).json({
+      ok: false
+    });
+  }
 }
 
 module.exports = {
