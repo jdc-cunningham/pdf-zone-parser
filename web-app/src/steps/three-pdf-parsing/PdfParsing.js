@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './PdfParsing.scss';
 import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -11,6 +11,7 @@ const PdfParsing = (props) => {
   const [autoPdfLoadErr, setAutoPdfLoadErr] = useState(false);
   const [creatingZone, setCreatingZone] = useState(false);
   const [showZoneDiv, setShowZoneDiv] = useState(false);
+  const [zones, setZones] = useState([]);
 
   const [zoneDimensions, setZoneDimensions] = useState({
     x: 0,
@@ -18,6 +19,9 @@ const PdfParsing = (props) => {
     width: 0,
     height: 0
   });
+
+  
+  const zoneDimensionsRef = useRef(zoneDimensions);
 
   const onDocumentLoadSuccess = () => {
 
@@ -94,8 +98,15 @@ const PdfParsing = (props) => {
   const mouseUpFcn = (e) => {
     window.removeEventListener('mousedown', mouseDownFcn);
     window.removeEventListener('mousemove', mouseMoveFcn);
-    window.removeEventListener('mouseup', mouseUpFcn)
-    setCreatingZone(false);
+    window.removeEventListener('mouseup', mouseUpFcn);
+
+    setZones(prev => ([
+      ...prev,
+      {
+        id: Date.now(),
+        ...zoneDimensionsRef.current
+      }
+    ]));
   }
 
   const mouseMoveFcn = (e) => {
@@ -108,6 +119,24 @@ const PdfParsing = (props) => {
     }));
   }
 
+  const deleteZone = (zoneId) => {
+    setZones(prev => ([
+      ...prev.filter(zone => zone.id !== zoneId)
+    ]));
+  }
+
+  useEffect(() => {
+    if (zoneDimensions.width > 0) {
+      zoneDimensionsRef.current = zoneDimensions;
+    }
+  }, [zoneDimensions]);
+
+  useEffect(() => {
+    console.log(zones);
+    setCreatingZone(false);
+    setShowZoneDiv(false);
+  }, [zones]);
+
   useEffect(() => {
     // have to bind/unbind these or they build up/fire multiple events
     if (creatingZone) {
@@ -115,7 +144,14 @@ const PdfParsing = (props) => {
     } else {
       window.removeEventListener('mousemove', mouseMoveFcn);
       window.removeEventListener('mousedown', mouseDownFcn);
-      window.removeEventListener('mouseup', mouseUpFcn)
+      window.removeEventListener('mouseup', mouseUpFcn);
+
+      setZoneDimensions({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0
+      });
     }
   }, [creatingZone]);
 
@@ -155,16 +191,29 @@ const PdfParsing = (props) => {
       <div className="App__pdf-parsing-left">
         {autoPdfLoadErr && <h2>Click on a PDF on the right to preview</h2>}
         {showZoneDiv && (zoneDimensions?.width > 0 && zoneDimensions?.height > 0) && <div
-          className="App__pdf-parsing-left-zone"
+          className="App__pdf-parsing-left-zone temp"
           style={{
             width: zoneDimensions.width,
             height: zoneDimensions.height,
             transform: `translate(${zoneDimensions.x}px, ${zoneDimensions.y}px)`
           }}
-          >
-            <p>Zone #</p>
-          </div>
+          ></div>
         }
+        {!showZoneDiv && zones.length > 0 && zones.map((zone, index) => <div
+          key={zone.id}
+          className="App__pdf-parsing-left-zone"
+          style={{
+            width: zone.width,
+            height: zone.height,
+            transform: `translate(${zone.x}px, ${zone.y}px)`
+          }}
+          >
+            <div className="zone-inner-wrapper">
+              <p>Zone # {index + 1}</p>
+            </div>
+            <button className="delete-zone" type="button" onClick={(e) => deleteZone(zone.id)}>x</button>
+          </div>
+        )}
         {!autoPdfLoadErr && <>
           <h2
             style={{

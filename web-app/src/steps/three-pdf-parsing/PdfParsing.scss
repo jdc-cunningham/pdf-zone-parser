@@ -32,14 +32,43 @@
   position: absolute;
   top: 0;
   left: 0;
-  padding: 1rem;
   z-index: 1;
   font-weight: bold;
-  font-size: 2rem;
-  background-color: blue;
-  opacity: 0.6;
   color: white;
-  text-align: right;
+
+  &.temp {
+    background-color: blue;
+    opacity: 0.6;
+  }
+
+  .zone-inner-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;  
+    background-color: blue;
+    opacity: 0.6;
+    padding: 1rem;
+    font-size: 1.5rem;
+  }
+
+  button.delete-zone {
+    position: absolute;
+    top: -1rem;
+    right: -1rem;
+    background-color: red;
+    color: white;
+    cursor: pointer;
+    z-index: 2;
+    border: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 1rem;
+    font-size: 1rem;
+    font-weight: bold;
+  }
 }
 
 .App__pdf-parsing-right {
