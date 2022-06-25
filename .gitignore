@@ -5,3 +5,4 @@ private.json
 # folders
 node_modules/
 server/uploads/
+server/pdf-screenshot-gen/screenshots/

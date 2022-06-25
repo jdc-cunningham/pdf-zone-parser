@@ -4,6 +4,11 @@ const { writeToCell } = require('./google-spreadsheet');
 const fs = require('fs');
 const AWS = require('aws-sdk');
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
+const { createWorker } = require('tesseract.js');
+
+const worker = createWorker({
+  logger: m => console.log(m)
+});
 
 AWS.config.update({
   region: process.env.AWS_S3_REGION,
@@ -245,9 +250,27 @@ const getSignedS3Url = (req, res) => {
   }
 };
 
+const _generateScreenshots = async (pdfUrl, zones) => {
+
+}
+
+const _parsePdfPartialScreenshot = async (pdfScreenshotImage) => {
+  await worker.load();
+  await worker.loadLanguage('eng');
+  await worker.initialize('eng');
+  const { data: { text } } = await worker.recognize('https://tesseract.projectnaptha.com/img/eng_bw.png');
+  console.log(text);
+  await worker.terminate();
+}
+
+const parsePdfZones = async (req, res) => {
+  
+}
+
 module.exports = {
   getShareEmail,
   saveSpreadsheetId,
   uploadPdfs,
-  getSignedS3Url
+  getSignedS3Url,
+  parsePdfZones
 }

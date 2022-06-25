@@ -12,6 +12,7 @@ const PdfParsing = (props) => {
   const [creatingZone, setCreatingZone] = useState(false);
   const [showZoneDiv, setShowZoneDiv] = useState(false);
   const [zones, setZones] = useState([]);
+  const [pdfParsing, setPdfParsing] = useState(false);
 
   const [zoneDimensions, setZoneDimensions] = useState({
     x: 0,
@@ -146,7 +147,23 @@ const PdfParsing = (props) => {
   }
 
   const parsePdfs = () => {
-    
+    axios.post(
+      `${process.env.REACT_APP_API_BASE}/parse-pdf-zones`, {
+      pdfs: pdfFileKeys,
+      zones,
+      zoneColumns: Array.from(document.querySelectorAll('.zone-col-letter')).map(el => el.getAttribute('id')), // anti-pattern
+      pdfDimensions
+    })
+    .then((res) => {
+      if (res.status === 200) {
+        setPdfParsing(true);
+      } else {
+        alert('Failed to start PDF parsing');
+      }
+    })
+    .catch(err => {
+      alert('Failed to start PDF parsing');
+    });
   }
 
   useEffect(() => {
@@ -257,7 +274,7 @@ const PdfParsing = (props) => {
           <h2 className="zone-header">Zones</h2>
           {zones.map((zone, index) => <span className="zone-span">
             <p>Zone # {index + 1}</p>
-            <input id={`zone-${zone.id}`} type="text" placeholder="spreadsheet col letter"/>
+            <input className="zone-col-letter" id={`zone-${zone.id}`} type="text" placeholder="spreadsheet col letter"/>
           </span>)}
         </>}
         <h2 className="pdfs-header">Uploaded PDFs</h2>
@@ -270,6 +287,7 @@ const PdfParsing = (props) => {
           {`> ${pdf.fileName}`}
         </p>)}
         <button className="pdf-parsing-right__parse-btn" type="button" onClick={(e) => parsePdfs()}>Parse PDFs</button>
+        {pdfParsing && <h2>Starting to parse PDFs...</h2>}
       </div>
     </div>
   );
