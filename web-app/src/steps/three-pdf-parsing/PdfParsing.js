@@ -87,10 +87,22 @@ const PdfParsing = (props) => {
 
     const mousePos = getMousePos(e);
 
+    const pdfContainer = document.querySelector('.App__pdf-parsing-left');
+
+    const xOffset = -1 * ((
+      pdfContainer.offsetWidth -
+      document.querySelector('.react-pdf__Page__canvas').offsetWidth
+    ) / 2) - 10; // 10 is the scrollbar, should check if visible, should always be due to AR
+
+    const scrollTop = pdfContainer.scrollTop
+    const yOffset = -88 + scrollTop;
+
     setZoneDimensions(prev => ({
       ...prev,
       x: mousePos.x,
-      y: mousePos.y
+      xOffset,
+      y: mousePos.y,
+      yOffset
     }));
 
     setShowZoneDiv(true);
@@ -147,12 +159,22 @@ const PdfParsing = (props) => {
   }
 
   const parsePdfs = () => {
+    const zoneColumnMap = {};
+
+    Array.from(document.querySelectorAll('.zone-col-letter')).forEach(el => {
+      zoneColumnMap[el.getAttribute('id')] = el.value;
+    });
+
     axios.post(
       `${process.env.REACT_APP_API_BASE}/parse-pdf-zones`, {
       pdfs: pdfFileKeys,
       zones,
-      zoneColumns: Array.from(document.querySelectorAll('.zone-col-letter')).map(el => el.getAttribute('id')), // anti-pattern
-      pdfDimensions
+      zoneColumnMap, // anti-pattern
+      pdfDimensions: {
+        width: pdfDimensions.width,
+        height: document.querySelector('.react-pdf__Page__canvas')?.offsetHeight
+      },
+      insertAtRow: document.getElementById('row-start').value // lazy
     })
     .then((res) => {
       if (res.status === 200) {
@@ -200,8 +222,7 @@ const PdfParsing = (props) => {
     const targetDisplay = document.querySelector('.App__pdf-parsing-left');
 
     setPdfDimensions({
-      width: Math.floor(targetDisplay?.offsetWidth * 0.9),
-      height: Math.floor(targetDisplay?.offsetHeight * 0.85)
+      width: Math.floor(targetDisplay?.offsetWidth * 0.9)
     });
 
     // pull first PDF/render it
@@ -272,6 +293,8 @@ const PdfParsing = (props) => {
         </>}
         {zones.length > 0 && <>
           <h2 className="zone-header">Zones</h2>
+          <p>Where the data will start</p>
+          <input id="row-start" type="number" placeholder="row number"/>
           {zones.map((zone, index) => <span className="zone-span">
             <p>Zone # {index + 1}</p>
             <input className="zone-col-letter" id={`zone-${zone.id}`} type="text" placeholder="spreadsheet col letter"/>
