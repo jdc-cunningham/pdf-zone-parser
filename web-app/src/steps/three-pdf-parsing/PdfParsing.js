@@ -125,6 +125,30 @@ const PdfParsing = (props) => {
     ]));
   }
 
+  const previewPdf = (pdfFileKey) => {
+    axios.post(
+      `${process.env.REACT_APP_API_BASE}/get-signed-s3-url`, {
+      fileKey: pdfFileKey,
+    })
+    .then((res) => {
+      if (res.status === 200) {
+        if (res.data?.url) {
+          setActivePdfUrl(res.data.url);
+        }
+      } else {
+        console.log('upload error');
+        setAutoPdfLoadErr(true);
+      }
+    })
+    .catch(err => {
+      setAutoPdfLoadErr(true);
+    });
+  }
+
+  const parsePdfs = () => {
+    
+  }
+
   useEffect(() => {
     if (zoneDimensions.width > 0) {
       zoneDimensionsRef.current = zoneDimensions;
@@ -132,7 +156,6 @@ const PdfParsing = (props) => {
   }, [zoneDimensions]);
 
   useEffect(() => {
-    console.log(zones);
     setCreatingZone(false);
     setShowZoneDiv(false);
   }, [zones]);
@@ -166,23 +189,7 @@ const PdfParsing = (props) => {
 
     // pull first PDF/render it
     if (pdfFileKeys.length) {
-      axios.post(
-        `${process.env.REACT_APP_API_BASE}/get-signed-s3-url`, {
-        fileKey: pdfFileKeys[0].fileKey,
-      })
-      .then((res) => {
-        if (res.status === 200) {
-          if (res.data?.url) {
-            setActivePdfUrl(res.data.url);
-          }
-        } else {
-          console.log('upload error');
-          setAutoPdfLoadErr(true);
-        }
-      })
-      .catch(err => {
-        setAutoPdfLoadErr(true);
-      });
+      previewPdf(pdfFileKeys[0].fileKey);
     }
   }, []);
 
@@ -255,8 +262,14 @@ const PdfParsing = (props) => {
         </>}
         <h2 className="pdfs-header">Uploaded PDFs</h2>
         <p>Click to preview</p>
-        {pdfFileKeys.map((pdf, index) => <p className="pdf-parsing-right__pdf-link" key={index}>{`> ${pdf.fileName}`}</p>)}
-        <button className="pdf-parsing-right__parse-btn" type="button">Parse PDFs</button>
+        {pdfFileKeys.map((pdf, index) => <p
+          className="pdf-parsing-right__pdf-link"
+          key={index}
+          onClick={() => previewPdf(pdf.fileKey)}
+        >
+          {`> ${pdf.fileName}`}
+        </p>)}
+        <button className="pdf-parsing-right__parse-btn" type="button" onClick={(e) => parsePdfs()}>Parse PDFs</button>
       </div>
     </div>
   );
