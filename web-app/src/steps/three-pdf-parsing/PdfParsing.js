@@ -246,8 +246,16 @@ const PdfParsing = (props) => {
           "Finish creating a zone on the PDF"
           <button type="button" onClick={() => setCreatingZone(false)}>Cancel</button>
         </>}
-        <h2>Uploaded PDFs</h2>
-        {pdfFileKeys.map((pdf, index) => <p className="pdf-parsing-right__pdf-link" key={index}>{pdf.fileName}</p>)}
+        {zones.length > 0 && <>
+          <h2 className="zone-header">Zones</h2>
+          {zones.map((zone, index) => <span className="zone-span">
+            <p>Zone # {index + 1}</p>
+            <input id={`zone-${zone.id}`} type="text" placeholder="spreadsheet col letter"/>
+          </span>)}
+        </>}
+        <h2 className="pdfs-header">Uploaded PDFs</h2>
+        <p>Click to preview</p>
+        {pdfFileKeys.map((pdf, index) => <p className="pdf-parsing-right__pdf-link" key={index}>{`> ${pdf.fileName}`}</p>)}
         <button className="pdf-parsing-right__parse-btn" type="button">Parse PDFs</button>
       </div>
     </div>

@@ -103,4 +103,19 @@
     margin-top: 1rem;
     cursor: pointer;
   }
+
+  h2 {
+    &.zone-header, &.pdfs-header {
+      margin-bottom: 0.5rem;
+    }
+  }
+
+  .zone-span p {
+    margin-top: 1rem;
+  }
+
+  .zone-span input {
+    font-size: 1rem;
+    padding: 0.5rem;
+  }
 }
