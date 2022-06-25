@@ -20,7 +20,7 @@ const PdfUpload = (props) => {
     )
     .then((res) => {
       if (res.status === 200) {
-        if (res.data.success) {
+        if (res.data.ok) {
           setPdfs([]);
           setCurrentStep(3);
         }

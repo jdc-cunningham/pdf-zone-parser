@@ -155,73 +155,70 @@ const _addDocToTable = async (docMeta) => {
 
 const uploadPdfs = async (req, res) => {
   const multerFilesArr = req.files;
+  const promises = [];
 
-  return new Promise((resolve, reject) => {
-    const promises = [];
+  multerFilesArr.forEach(file => {
+    promises.push(
+      new Promise((resolve, reject) => {
+        const fileName = file.originalname;
+        const fileKey = `${_getDateTime()}_${_makeRandomStr(16)}_${_slugify(fileName)}.pdf`;
+  
+        fs.readFile(file.path, (err, buff) => {
+          const uploadParams = {
+            Bucket: bucketName,
+            Key: fileKey,
+            Body: buff,
+            ContentType: 'application/pdf'
+          };
+      
+          s3.upload(uploadParams, async (err, data) => {
+            if (err) {
+              console.log("Upload to s3 err" + err);
+              reject(false);
+            }
 
-    multerFilesArr.forEach(file => {
-      promises.push(
-        new Promise((resolve, reject) => {
-          const fileName = file.originalname;
-          const fileKey = `${_getDateTime()}_${_makeRandomStr(16)}_${_slugify(fileName)}.pdf`;
-    
-          fs.readFile(file.path, (err, buff) => {
-            const uploadParams = {
-              Bucket: bucketName,
-              Key: fileKey,
-              Body: buff,
-              ContentType: 'application/pdf'
-            };
-        
-            s3.upload(uploadParams, async (err, data) => {
+            if (data) {
+              const uploadedMeta = {
+                fileName: fileName,
+                fileKey: fileKey,
+                dateAdded: _getDateTime('full')
+              };
+
+              const pdfAddedToDb = await _addDocToTable(uploadedMeta);
+
+              if (pdfAddedToDb) {
+                resolve(fileName);
+              } else {
+                console.log('failed db write');
+                reject(false); // could mean duplicate uploads
+              }
+            }
+            // delete from temporary folder
+            fs.unlink(file.path, (err) => {
               if (err) {
-                console.log("Upload to s3 err" + err);
-                reject(false);
+                console.log(`failed to delete file ${fileName}`)
               }
-
-              if (data) {
-                const uploadedMeta = {
-                  fileName: fileName,
-                  fileKey: fileKey,
-                  dateAdded: _getDateTime('full')
-                };
-
-                const pdfAddedToDb = await _addDocToTable(uploadedMeta);
-
-                if (pdfAddedToDb) {
-                  resolve(fileName);
-                } else {
-                  console.log('failed db write');
-                  reject(false); // could mean duplicate uploads
-                }
-              }
-              // delete from temporary folder
-              fs.unlink(file.path, (err) => {
-                if (err) {
-                  console.log(`failed to delete file ${fileName}`)
-                }
-              });
             });
           });
-        })
-      );
-    });
-
-    Promise
-      .all(promises)
-      .then((vals) => {
-        res.status(200).json({ // this is brittle requiring all to work, no catch for partial failure
-          ok: true,
-          uploaded: vals
         });
       })
-      .catch((err) => {
-        console.log('promise all err', err);
-        res.status(400).json({
-          ok: false,
-        });
-      })
+    );
   });
+
+  Promise
+    .all(promises)
+    .then((vals) => {
+      res.status(200).json({ // this is brittle requiring all to work, no catch for partial failure
+        ok: true,
+        uploaded: vals
+      });
+    })
+    .catch((err) => {
+      console.log('promise all err', err);
+      res.status(400).json({
+        ok: false,
+      });
+    })
 }
 module.exports = {
   getShareEmail,
