@@ -6,3 +6,8 @@ Server
 - [ ] websocket host
 - [ ] parsing save
 - [ ] processing queue
+
+Get it live
+- [ ] get new domain
+- [ ] rent VPS, set it up
+- [ ] host everythign, get SSL running, point domain

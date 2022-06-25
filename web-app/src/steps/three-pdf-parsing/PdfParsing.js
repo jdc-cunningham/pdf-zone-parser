@@ -9,6 +9,15 @@ const PdfParsing = (props) => {
   const [pdfDimensions, setPdfDimensions] = useState({});
   const [activePdfUrl, setActivePdfUrl] = useState('');
   const [autoPdfLoadErr, setAutoPdfLoadErr] = useState(false);
+  const [creatingZone, setCreatingZone] = useState(false);
+  const [showZoneDiv, setShowZoneDiv] = useState(false);
+
+  const [zoneDimensions, setZoneDimensions] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0
+  });
 
   const onDocumentLoadSuccess = () => {
 
@@ -17,6 +26,98 @@ const PdfParsing = (props) => {
   const onDocumentPageRenderSuccess = () => {
 
   }
+
+  // make sure clicking over PDF
+  const checkBounds = (e) => {
+    var ev = e || window.event; //Moz || IE
+    let x, y;
+
+    // keep within pdf
+    const pdfPageBounds = document.querySelector('.react-pdf__Page__canvas')?.getBoundingClientRect();
+
+    if (ev.pageX) { //Moz
+      x = ev.pageX + window.pageXOffset;
+      y = ev.pageY + window.pageYOffset;
+
+      if (x > pdfPageBounds.left && x < pdfPageBounds.right && y > pdfPageBounds.top && y < pdfPageBounds.bottom) {
+        return true;
+      } else {
+        return false;
+      }
+    } else if (ev.clientX) { //IE
+      x = ev.clientX + document.body.scrollLeft;
+      y = ev.clientY + document.body.scrollTop;
+      
+      if (x > pdfPageBounds.left && x < pdfPageBounds.right && y > pdfPageBounds.top && y < pdfPageBounds.bottom) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  }
+
+  const getMousePos = (e) => {
+    var ev = e || window.event; //Moz || IE
+    if (ev.pageX) { //Moz
+      return {
+        x: ev.pageX + window.pageXOffset,
+        y: ev.pageY + window.pageYOffset
+      };
+    } else if (ev.clientX) { //IE
+      return {
+        x: ev.clientX + document.body.scrollLeft,
+        y: ev.clientY + document.body.scrollTop
+      };
+    }
+  };
+
+  const mouseDownFcn = (e) => {
+    if (!checkBounds(e)) {
+      return;
+    }
+
+    // start listening for these events
+    window.addEventListener('mousemove', mouseMoveFcn);
+    window.addEventListener('mouseup', mouseUpFcn);
+
+    const mousePos = getMousePos(e);
+
+    setZoneDimensions(prev => ({
+      ...prev,
+      x: mousePos.x,
+      y: mousePos.y
+    }));
+
+    setShowZoneDiv(true);
+  }
+
+  const mouseUpFcn = (e) => {
+    window.removeEventListener('mousedown', mouseDownFcn);
+    window.removeEventListener('mousemove', mouseMoveFcn);
+    window.removeEventListener('mouseup', mouseUpFcn)
+    setCreatingZone(false);
+  }
+
+  const mouseMoveFcn = (e) => {
+    const mousePos = getMousePos(e);
+
+    setZoneDimensions(prev => ({
+      ...prev,
+      width: mousePos.x - prev.x,
+      height: mousePos.y - prev.y
+    }));
+  }
+
+  useEffect(() => {
+    // have to bind/unbind these or they build up/fire multiple events
+    if (creatingZone) {
+      window.addEventListener('mousedown', mouseDownFcn);
+    } else {
+      window.removeEventListener('mousemove', mouseMoveFcn);
+      window.removeEventListener('mousedown', mouseDownFcn);
+      window.removeEventListener('mouseup', mouseUpFcn)
+    }
+  }, [creatingZone]);
 
   useEffect(() => {
     // set PDF render dimension based on window size
@@ -53,6 +154,17 @@ const PdfParsing = (props) => {
     <div className="App__pdf-parsing">
       <div className="App__pdf-parsing-left">
         {autoPdfLoadErr && <h2>Click on a PDF on the right to preview</h2>}
+        {showZoneDiv && (zoneDimensions?.width > 0 && zoneDimensions?.height > 0) && <div
+          className="App__pdf-parsing-left-zone"
+          style={{
+            width: zoneDimensions.width,
+            height: zoneDimensions.height,
+            transform: `translate(${zoneDimensions.x}px, ${zoneDimensions.y}px)`
+          }}
+          >
+            <p>Zone #</p>
+          </div>
+        }
         {!autoPdfLoadErr && <>
           <h2
             style={{
@@ -65,7 +177,6 @@ const PdfParsing = (props) => {
           <Document
             file={activePdfUrl}
             onLoadSuccess={onDocumentLoadSuccess}
-            className="page-document-signing__active-document-pdf-canvas"
             noData="Awaiting files..."
           >
             <Page
@@ -81,7 +192,11 @@ const PdfParsing = (props) => {
       </div>
       <div className="App__pdf-parsing-right">
         <h2>Create a PDF zone</h2>
-        <span><button type="button">+</button> Create Parsing Zone</span>
+        {!creatingZone && <span><button type="button" onClick={() => setCreatingZone(true)}>+</button> Create Parsing Zone</span>}
+        {creatingZone && <>
+          "Finish creating a zone on the PDF"
+          <button type="button" onClick={() => setCreatingZone(false)}>Cancel</button>
+        </>}
         <h2>Uploaded PDFs</h2>
         {pdfFileKeys.map((pdf, index) => <p className="pdf-parsing-right__pdf-link" key={index}>{pdf.fileName}</p>)}
         <button className="pdf-parsing-right__parse-btn" type="button">Parse PDFs</button>

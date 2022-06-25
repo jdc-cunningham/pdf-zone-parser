@@ -8,6 +8,7 @@
 }
 
 .App__pdf-parsing-left {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -27,11 +28,34 @@
   }
 }
 
+.App__pdf-parsing-left-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 1rem;
+  z-index: 1;
+  font-weight: bold;
+  font-size: 2rem;
+  background-color: blue;
+  opacity: 0.6;
+  color: white;
+  text-align: right;
+}
+
 .App__pdf-parsing-right {
   width: 24%;
   border-left: 1px solid #ccc;
   height: 100%;
   padding: 1rem;
+
+  span button {
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  h2:first-of-type {
+    margin-bottom: 0.5rem;
+  }
 
   h2:not(:first-of-type) {
     margin-top: 1.5rem;
