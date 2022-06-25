@@ -4,3 +4,4 @@ private.json
 
 # folders
 node_modules/
+server/uploads/

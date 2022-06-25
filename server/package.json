@@ -1,9 +1,12 @@
 {
   "dependencies": {
+    "aws-sdk": "^2.1162.0",
     "body-parser": "^1.20.0",
     "dotenv": "^16.0.1",
     "express": "^4.18.1",
+    "fs": "^0.0.1-security",
     "googleapis": "^104.0.0",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^2.3.3",
     "nodemon": "^2.0.18"
   }

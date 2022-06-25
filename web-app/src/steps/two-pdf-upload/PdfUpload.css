@@ -1,0 +1,9 @@
+.App__pdf-upload {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  width: 100%;
+  max-width: 800px;
+  height: 100vh;
+}

@@ -6,8 +6,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
 const port = 5021;
+const multer  = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
-const { getShareEmail, saveSpreadsheetId } = require('./methods');
+const { getShareEmail, saveSpreadsheetId, uploadPdfs } = require('./methods');
 
 // CORs
 app.use((req, res, next) => {
@@ -30,7 +32,8 @@ app.get('/',(req, res) => {
 
 // note there is no authentication middleware in this app
 app.get('/get-share-email', getShareEmail);
-app.post('/save-spreadsheet-id', saveSpreadsheetId)
+app.post('/save-spreadsheet-id', saveSpreadsheetId);
+app.post('/upload-pdfs', upload.array('files'), uploadPdfs);
 
 app.listen(port, () => {
   console.log(`App running... on port ${port}`);

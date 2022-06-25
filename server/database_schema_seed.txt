@@ -22,6 +22,7 @@ CREATE TABLE `pdf_uploads` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11),
   `file_name` varchar(255),
+  `file_key` varchar(255),
   `parsed` boolean,
   `upload_date` datetime,
   PRIMARY KEY (`id`)

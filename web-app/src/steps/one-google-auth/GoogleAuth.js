@@ -37,6 +37,10 @@ const GoogleAuth = (props) => {
       .then((res) => {
         if (res.status === 200) {
           setShareEmailAddress(res.data?.sharedEmail);
+          setSpreadsheetId(res.data?.spreadsheetId);
+          if (res.data?.spreadsheetId) {
+            setCurrentStep(2);
+          }
         }
       })
       .catch((err) => {

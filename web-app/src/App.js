@@ -22,7 +22,9 @@ const App = () => {
         spreadsheetId={spreadsheetId}
         setSpreadsheetId={setSpreadsheetId}
       />}
-      {hasPdfs && <PdfUpload/>}
+      {hasPdfs && <PdfUpload
+        setCurrentStep={setCurrentStep}
+      />}
       {isProcessingPdfs && <PdfParsing/>}
     </div>
   );
