@@ -3,7 +3,7 @@ import './PdfUpload.css';
 import axios from 'axios';
 
 const PdfUpload = (props) => {
-  const { setCurrentStep } = props;
+  const { setCurrentStep, setPdfFileKeys } = props;
   const [pdfs, setPdfs] = useState([]);
   const [dragDetected, setDragDetected] = useState(false);
 
@@ -21,6 +21,7 @@ const PdfUpload = (props) => {
     .then((res) => {
       if (res.status === 200) {
         if (res.data.ok) {
+          setPdfFileKeys(res.data.uploaded);
           setPdfs([]);
           setCurrentStep(3);
         }

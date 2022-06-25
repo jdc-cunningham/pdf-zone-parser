@@ -8,6 +8,7 @@ const App = () => {
   const [currentStep, setCurrentStep] = useState(1); // this is weird
   const [shareEmailAddress, setShareEmailAddress] = useState(null);
   const [spreadsheetId, setSpreadsheetId] = useState('');
+  const [pdfFileKeys, setPdfFileKeys] = useState([]);
 
   const isAuthenticated = currentStep === 1;
   const hasPdfs = currentStep === 2;
@@ -24,8 +25,11 @@ const App = () => {
       />}
       {hasPdfs && <PdfUpload
         setCurrentStep={setCurrentStep}
+        setPdfFileKeys={setPdfFileKeys}
       />}
-      {isProcessingPdfs && <PdfParsing/>}
+      {isProcessingPdfs && <PdfParsing
+        pdfFileKeys={pdfFileKeys}
+      />}
     </div>
   );
 }

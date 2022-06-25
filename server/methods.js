@@ -11,7 +11,7 @@ AWS.config.update({
   secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
 });
 
-const s3 = new AWS.S3({apiVersion: '2006-03-01'});
+const s3 = new AWS.S3({apiVersion: '2006-03-01', signatureVersion: "v4"});
 
 const _getDateTime = (format = '') => {
   // from https://stackoverflow.com/questions/8083410/how-can-i-set-the-default-timezone-in-node-js
@@ -187,7 +187,10 @@ const uploadPdfs = async (req, res) => {
               const pdfAddedToDb = await _addDocToTable(uploadedMeta);
 
               if (pdfAddedToDb) {
-                resolve(fileName);
+                resolve({
+                  fileName,
+                  fileKey
+                });
               } else {
                 console.log('failed db write');
                 reject(false); // could mean duplicate uploads
@@ -220,8 +223,31 @@ const uploadPdfs = async (req, res) => {
       });
     })
 }
+
+const getSignedS3Url = (req, res) => {
+  const fileKey = req.body.fileKey;
+
+  const url = s3.getSignedUrl('getObject', {
+    Bucket: bucketName,
+    Key: fileKey,
+    Expires: 3600 // 1 hr
+  });
+
+  if (url) {
+    res.status(200).json({
+      ok: true,
+      url
+    });
+  } else {
+    res.status(400).json({
+      ok: false
+    });
+  }
+};
+
 module.exports = {
   getShareEmail,
   saveSpreadsheetId,
-  uploadPdfs
+  uploadPdfs,
+  getSignedS3Url
 }
