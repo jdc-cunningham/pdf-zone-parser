@@ -1,16 +1,12 @@
 require('dotenv').config();
 const { pool } = require('./dbConnect');
-const { writeToCell } = require('./google-spreadsheet');
+const { writeDataToSpreadsheet } = require('./google-spreadsheet');
 const fs = require('fs');
 const AWS = require('aws-sdk');
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
 const { createWorker } = require('tesseract.js');
 const { getPdfCropImages, pdfImgPath, pdfLocalPath} = require('./pdf-screenshot-gen/generator');
 const globalSubImages = [];
-
-const worker = createWorker({
-  logger: m => console.log(m)
-});
 
 AWS.config.update({
   region: process.env.AWS_S3_REGION,
@@ -63,7 +59,7 @@ const _makeRandomStr = (length) => {
   return result
 }
 
-const _slugify = (text) => text
+const _slugifyNoPdf = (text) => text
   .toLowerCase()
   .replace('.pdf', '')
   .replace(/[^\w-]+/g,'')
@@ -168,7 +164,7 @@ const uploadPdfs = async (req, res) => {
     promises.push(
       new Promise((resolve, reject) => {
         const fileName = file.originalname;
-        const fileKey = `${_getDateTime()}_${_makeRandomStr(16)}_${_slugify(fileName)}.pdf`;
+        const fileKey = `${_getDateTime()}_${_makeRandomStr(16)}_${_slugifyNoPdf(fileName)}.pdf`;
   
         fs.readFile(file.path, (err, buff) => {
           const uploadParams = {
@@ -262,13 +258,16 @@ const _getSignedS3Url = (fileKey) => {
   return url
 }
 
-const _parsePdfPartialScreenshot = async (pdfZoneImagePath) => {
+const _parsePdfPartialScreenshot = async (pdfZoneImagePath, worker) => {
+  console.log('img', pdfZoneImagePath);
   const { data: { text } } = await worker.recognize(pdfZoneImagePath);
-  return text;
+  // await worker.terminate();
+  console.log('txt', text);
+  return text.trim();
 }
 
 // object or boolean? yum
-const _getPdfIdFromFileKey = async () => {
+const _getPdfIdFromFileKey = async (fileKey) => {
   return new Promise(resolve => {
     pool.query(
       `${'SELECT id, user_id FROM pdf_uploads WHERE file_key = ?'}`,
@@ -339,14 +338,15 @@ const _cleanUpPreviousProcessFiles = async (pdfPath, pdfImgPath, subImagePaths) 
 }
 
 // returns object with parsed data
-const _processPdf = async (fileKey, filePath, pdfDimensions, cropZones, zoneColumnMap, insertAtRow) => {
-  const subImages = await getPdfCropImages(filePath, pdfDimensions, cropZones, globalSubImages);
+const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColumnMap, insertAtRow, worker) => {
+  const subImages = await getPdfCropImages(pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages);
   const subImagesZoneText = {};
+  const fileKey = pdfInfo.fileKey;
 
   // lazy
   for (let i = 0; i < subImages.length; i++) {
     const zoneId = subImages[i].split('/screenshots/')[1].split('.jpg')[0];
-    const zoneText = await _parsePdfPartialScreenshot(subImages[i]);
+    const zoneText = await _parsePdfPartialScreenshot(subImages[i], worker);
     const colLetter = zoneColumnMap[`zone-${zoneId}`];
 
     // \n appears at the end of every parsed line, it's valid for block text
@@ -355,10 +355,12 @@ const _processPdf = async (fileKey, filePath, pdfDimensions, cropZones, zoneColu
     // https://stackoverflow.com/a/4009768/2710227
     const nlCount = (zoneText.match(/\n/g) || []).length;
 
-    subImagesZoneText[`${colLetter}${parseInt(insertAtRow) + i}`] = nlCount > 1
+    subImagesZoneText[`${colLetter}${parseInt(insertAtRow)}`] = nlCount > 1
       ? zoneText
       : zoneText.replace(/\n/g, '');
   }
+
+  // await worker.terminate();
 
   return {
     fileKey,
@@ -372,42 +374,98 @@ const _clientPing = async () => {
   });
 }
 
+// assumed user_id 1
+const _getSheetId = async () => {
+  return new Promise(resolve => {
+    pool.query(
+      `${'SELECT spreadsheet_id FROM users where id = 1'}`,
+      (err, qRes) => {
+        if (err) {
+          console.log(err);
+          resolve('');
+        } else {
+          resolve(qRes[0].spreadsheet_id);
+        }
+      }
+    );
+  });
+}
+
 const _processPdfs = async (reqBody) => {
   return new Promise(async (resolve) => {
     const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
 
     if (pdfs.length) {
-      const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
-      const pdfParsedData = await _processPdf(pdfs[0].fileKey, pdfPath, pdfDimensions, zones, zoneColumnMap);
-      const updateDB = await _updateDBParsedPdf(pdfParsedData);
-      const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
-      const cleanUpFiles = await _cleanUpPreviousProcessFiles(pdfLocalPath, pdfImgPath, globalSubImages); // last global param bad
-      await _clientPing((updateDB && writeToGS), pdfs[0].fileName);
-      pdfs.shift();
-      _processPdfs(reqBody);
+      const sheetId = await _getSheetId();
+      const promises = [];
+
+      // start OCR
+      const worker = createWorker({
+        langPath: './eng.traineddata',
+        // logger: m => console.log(m)
+      });
+      await worker.load();
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+
+      pdfs.forEach(pdf => {
+        promises.push(
+          new Promise(async (resolve) => {
+            const pdfS3Url = _getSignedS3Url(pdf.fileKey);
+            const pdfParsedData = await _processPdf(pdf, pdfS3Url, pdfDimensions, zones, zoneColumnMap, insertAtRow, worker);
+            const updatedDB = await _updateDBParsedPdf(pdfParsedData);
+            const wroteToGS = await writeDataToSpreadsheet(pdfParsedData, sheetId);
+            // await _cleanUpPreviousProcessFiles(pdfLocalPath, pdfImgPath, globalSubImages); // last global param bad
+            // await _clientPing((updateDB && writeToGS), pdf.fileName); // ws
+
+            console.log(updatedDB);
+            console.log(wroteToGS);
+
+            if (!updatedDB || !wroteToGS) {
+              resolve(false);
+            }
+
+            resolve(true);
+          })
+        );
+      });
+
+      Promise
+      .all(promises)
+      .then(() => {
+        resolve(true);
+      })
+      .catch(err => {
+        console.log(err);
+        resolve(false);
+      })
+      .finally(async () => {
+        // end OCR
+        await worker.terminate();
+      });
     } else {
       resolve(true);
     }
   });
 }
 
-const manualRun = async (reqBody) => {
-  const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
-  const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
-  // start up OCR
-  await worker.load();
-  await worker.loadLanguage('eng');
-  await worker.initialize('eng');
-  const pdfParsedData = await _processPdf(pdfs[0].fileKey, pdfPath, pdfDimensions, zones, zoneColumnMap, insertAtRow);
-  console.log(pdfParsedData);
-  // end OCR
-  await worker.terminate();
-  // const updateDB = await _updateDBParsedPdf(pdfParsedData);
-  // const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
-  // await _clientPing((updateDB && writeToGS), pdfs[0].fileName);
-  // pdfs.shift();
-  // _processPdfs(reqBody);
-}
+// const manualRun = async (reqBody) => {
+//   const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
+//   const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
+//   // start up OCR
+//   await worker.load();
+//   await worker.loadLanguage('eng');
+//   await worker.initialize('eng');
+//   const pdfParsedData = await _processPdf(pdfs[0].fileKey, pdfPath, pdfDimensions, zones, zoneColumnMap, insertAtRow);
+//   console.log(pdfParsedData);
+//   // end OCR
+//   await worker.terminate();
+//   // const updateDB = await _updateDBParsedPdf(pdfParsedData);
+//   // const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
+//   // await _clientPing((updateDB && writeToGS), pdfs[0].fileName);
+//   // pdfs.shift();
+//   // _processPdfs(reqBody);
+// }
 
 const payload = {
   "pdfs": [
@@ -461,10 +519,10 @@ const payload = {
   "insertAtRow": "2"
 };
 
-manualRun(payload);
+// manualRun(payload);
 
 const parsePdfZones = async (req, res) => {
-  const processingFinished = await _processPdfs(req.Body);
+  const processingFinished = await _processPdfs(req.body);
 
   if (processingFinished) {
     res.status(200).json({

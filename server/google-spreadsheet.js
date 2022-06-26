@@ -25,10 +25,44 @@ const authenticate = async () => {
   });
 };
 
-const writeToCell = async () => {
-  
+const writeDataToSpreadsheet = async (data, sheetId) => {
+  const authenticated = await authenticate();
+  const { subImagesZoneText } = data;
+
+  console.log(authenticated);
+  console.log(subImagesZoneText);
+
+  return new Promise(async (resolve) => {
+    if (authenticated) {
+      const cells = Object.keys(subImagesZoneText);
+      const first = cells[0];
+      const last = cells[cells.length - 1];
+      const range = `Sheet1!${first}:${last}`; // very brittle
+      const resource = Object.keys(subImagesZoneText).map(cell => subImagesZoneText[cell]);
+
+      console.log(range);
+      console.log(resource);
+
+      sheets.spreadsheets.values.update({
+        auth: jwtClient,
+        spreadsheetId: sheetId,
+        range,
+        resource,
+        valueInputOption: 'RAW',
+      }, (err, res) => {
+        if (err) {
+          // handle this err
+          console.log(err);
+        } else {
+          resolve(true);
+        }
+      });
+    } else {
+      resolve(false);
+    }
+  });
 }
 
 module.exports = {
-  writeToCell
+  writeDataToSpreadsheet
 };

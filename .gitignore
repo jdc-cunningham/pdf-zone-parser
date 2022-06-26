@@ -3,7 +3,8 @@
 private.json
 active.jpg
 active.pdf
-eng.traineddata
+server/pdf-screenshot-gen/*.pdf
+server/pdf-screenshot-gen/*.jpg
 
 # folders
 node_modules/

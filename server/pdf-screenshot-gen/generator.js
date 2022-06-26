@@ -3,18 +3,23 @@ const fs = require('fs');
 const sharp = require('sharp');
 const exec = require('child_process').exec;
 const axios = require('axios').default;
-const pdfImgPath = __dirname + '/active.jpg';
-const pdfLocalPath = __dirname + '/active.pdf';
+
+const _slugifyNoPdf = (text) => text
+  .toLowerCase()
+  .replace('.pdf', '')
+  .replace(/[^\w-]+/g,'-')
+  .replace(/ +/g,'-');
 
 // this sucks, why upload it if you're just going to download it again
 // batch is the reason and security (stored on AWS encrypted at rest)
-const _downloadPdfToLocal = async (pdfS3SignedUrl) => {
+const _downloadPdfToLocal = async (pdfS3SignedUrl, fileName) => {
   return new Promise(resolve => {
     axios({
       method: "get",
       url: pdfS3SignedUrl,
       responseType: "stream"
     }).then(function (response) {
+      const pdfLocalPath = __dirname + `/${_slugifyNoPdf(fileName)}.pdf`;
       const stream = response.data.pipe(fs.createWriteStream(pdfLocalPath));
       stream.on('finish', () => {
         resolve(true);
@@ -23,11 +28,15 @@ const _downloadPdfToLocal = async (pdfS3SignedUrl) => {
   });
 }
 
-const _generateImageFromPdf = (pdfPath) => {
+const _generateImageFromPdf = (pdfInfo, pdfS3Url) => {
   return new Promise(async (resolve) => {
-    const localPdfDownloaded = await _downloadPdfToLocal(pdfPath);
+    const localPdfDownloaded = await _downloadPdfToLocal(pdfS3Url, pdfInfo.fileName);
 
     if (!localPdfDownloaded) resolve(false);
+
+    const { fileName } = pdfInfo;
+    const pdfImgPath = __dirname + `/${_slugifyNoPdf(fileName)}.jpg`;
+    const pdfLocalPath = __dirname + `/${_slugifyNoPdf(fileName)}.pdf`;
 
     // this is probably a vulnerability right here, since it passes an external value
     // (the file name) into command line, would want to rename the file, strip it, use an alias, something
@@ -92,9 +101,9 @@ const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier,
   });
 }
 
-const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones, globalSubImages) => {
+const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages) => {
   return new Promise(async (resolve) => {
-    const pdfImagePath = await _generateImageFromPdf(pdfPath, pdfDimensions);
+    const pdfImagePath = await _generateImageFromPdf(pdfInfo, pdfS3Url);
     const subImages = [];
     const image = await sharp(pdfImagePath);
     const metadata = await image.metadata();
@@ -109,7 +118,6 @@ const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones, globalSubImag
 
     try {
       await _getCroppedImages(cropZones, pdfImagePath, subImages, {x: xMultiplier, y: yMultiplier}, pdfDimensions);
-      console.log('await done');
       globalSubImages = subImages; // used for deletion
       resolve(subImages);
     } catch (err) {
@@ -120,7 +128,5 @@ const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones, globalSubImag
 };
 
 module.exports = {
-  getPdfCropImages,
-  pdfImgPath,
-  pdfLocalPath
+  getPdfCropImages
 }
