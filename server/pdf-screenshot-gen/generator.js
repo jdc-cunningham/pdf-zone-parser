@@ -52,30 +52,43 @@ const _generateImageFromPdf = (pdfPath) => {
 
 const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier, pdfDimensions) => {
   return new Promise(async (resolve) => {
-    if (cropZones.length) {
-      const { x, y, width, height, id, xOffset, yOffset } = cropZones[0];
-      const subImageFileName = __dirname + `./screenshots/${id}.jpg`;
+    const promises = [];
 
-      sharp(pdfImagePath)
-        .extract({
-          left: Math.trunc((x + xOffset) * multiplier.x),
-          top: Math.trunc((y + yOffset) * multiplier.y),
-          width: Math.trunc(width * multiplier.x),
-          height: Math.trunc(height * multiplier.y)
+    cropZones.forEach(zone => {
+      promises.push(
+        new Promise(resolve => {
+          const { x, y, width, height, id, xOffset, yOffset } = zone;
+          const subImageFileName = __dirname + `/screenshots/${id}.jpg`;
+
+          sharp(pdfImagePath)
+            .extract({
+              left: Math.trunc((x + xOffset) * multiplier.x),
+              top: Math.trunc((y + yOffset) * multiplier.y),
+              width: Math.trunc(width * multiplier.x),
+              height: Math.trunc(height * multiplier.y)
+            })
+            .toFile(subImageFileName, function (err) {
+              if (err) {
+                console.log(err);
+                resolve(false);
+              } else {
+                subImages.push(subImageFileName);
+                resolve(true);
+              }
+            });
         })
-        .toFile(subImageFileName, function (err) {
-          if (err) {
-            console.log(err);
-            resolve(false);
-          } else {
-            subImages.push(subImageFileName);
-            cropZones.shift();
-            _getCroppedImages(cropZones, pdfImagePath, subImages, multiplier, pdfDimensions);
-          }
-        });
-    } else {
-      resolve(true);
-    }
+      );
+    });
+
+    Promise
+      .all(promises)
+      .then(subImages => {
+        resolve(subImages);
+      })
+      .catch(err => {
+        console.log(err);
+        resolve([]);
+      });
   });
 }
 

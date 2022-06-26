@@ -262,13 +262,9 @@ const _getSignedS3Url = (fileKey) => {
   return url
 }
 
-const _parsePdfPartialScreenshot = async () => {
-  await worker.load();
-  await worker.loadLanguage('eng');
-  await worker.initialize('eng');
-  const { data: { text } } = await worker.recognize('https://tesseract.projectnaptha.com/img/eng_bw.png');
-  console.log(text);
-  await worker.terminate();
+const _parsePdfPartialScreenshot = async (pdfZoneImagePath) => {
+  const { data: { text } } = await worker.recognize(pdfZoneImagePath);
+  return text;
 }
 
 // object or boolean? yum
@@ -290,6 +286,7 @@ const _getPdfIdFromFileKey = async () => {
 
 const _updateDBParsedPdf = async (pdfParsedData) => {
   return new Promise(async (resolve) => {
+    const { fileKey, subImagesZoneText } = pdfParsedData;
     const pdfMeta = await _getPdfIdFromFileKey(fileKey);
 
     if (pdfMeta?.id) {
@@ -342,9 +339,31 @@ const _cleanUpPreviousProcessFiles = async (pdfPath, pdfImgPath, subImagePaths) 
 }
 
 // returns object with parsed data
-const _processPdf = async (filePath, pdfDimensions, cropZones) => {
+const _processPdf = async (fileKey, filePath, pdfDimensions, cropZones, zoneColumnMap, insertAtRow) => {
   const subImages = await getPdfCropImages(filePath, pdfDimensions, cropZones, globalSubImages);
-  console.log(subImages);
+  const subImagesZoneText = {};
+
+  // lazy
+  for (let i = 0; i < subImages.length; i++) {
+    const zoneId = subImages[i].split('/screenshots/')[1].split('.jpg')[0];
+    const zoneText = await _parsePdfPartialScreenshot(subImages[i]);
+    const colLetter = zoneColumnMap[`zone-${zoneId}`];
+
+    // \n appears at the end of every parsed line, it's valid for block text
+    // count occurences, multiple = block
+
+    // https://stackoverflow.com/a/4009768/2710227
+    const nlCount = (zoneText.match(/\n/g) || []).length;
+
+    subImagesZoneText[`${colLetter}${parseInt(insertAtRow) + i}`] = nlCount > 1
+      ? zoneText
+      : zoneText.replace(/\n/g, '');
+  }
+
+  return {
+    fileKey,
+    subImagesZoneText
+  };
 }
 
 const _clientPing = async () => {
@@ -359,7 +378,7 @@ const _processPdfs = async (reqBody) => {
 
     if (pdfs.length) {
       const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
-      const pdfParsedData = await _processPdf(pdfPath, pdfDimensions, zones, zoneColumnMap);
+      const pdfParsedData = await _processPdf(pdfs[0].fileKey, pdfPath, pdfDimensions, zones, zoneColumnMap);
       const updateDB = await _updateDBParsedPdf(pdfParsedData);
       const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
       const cleanUpFiles = await _cleanUpPreviousProcessFiles(pdfLocalPath, pdfImgPath, globalSubImages); // last global param bad
@@ -375,8 +394,15 @@ const _processPdfs = async (reqBody) => {
 const manualRun = async (reqBody) => {
   const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
   const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
-  const pdfParsedData = await _processPdf(pdfPath, pdfDimensions, zones, zoneColumnMap);
-  const updateDB = await _updateDBParsedPdf(pdfParsedData);
+  // start up OCR
+  await worker.load();
+  await worker.loadLanguage('eng');
+  await worker.initialize('eng');
+  const pdfParsedData = await _processPdf(pdfs[0].fileKey, pdfPath, pdfDimensions, zones, zoneColumnMap, insertAtRow);
+  console.log(pdfParsedData);
+  // end OCR
+  await worker.terminate();
+  // const updateDB = await _updateDBParsedPdf(pdfParsedData);
   // const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
   // await _clientPing((updateDB && writeToGS), pdfs[0].fileName);
   // pdfs.shift();
