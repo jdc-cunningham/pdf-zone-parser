@@ -1,6 +1,8 @@
 # files
 .env
 private.json
+active.jpg
+active.pdf
 
 # folders
 node_modules/

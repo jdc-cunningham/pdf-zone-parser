@@ -1,13 +1,38 @@
 require('dotenv').config();
+const fs = require('fs');
 const sharp = require('sharp');
 const exec = require('child_process').exec;
-const pdfImgPath = __dirname + '/screenshots/pdf.jpg';
+const axios = require('axios').default;
+const pdfImgPath = __dirname + '/active.jpg';
+const pdfLocalPath = __dirname + '/active.pdf';
 
+// this sucks, why upload it if you're just going to download it again
+// batch is the reason and security (stored on AWS encrypted at rest)
+const _downloadPdfToLocal = async (pdfS3SignedUrl) => {
+  return new Promise(resolve => {
+    axios({
+      method: "get",
+      url: pdfS3SignedUrl,
+      responseType: "stream"
+    }).then(function (response) {
+      const stream = response.data.pipe(fs.createWriteStream(pdfLocalPath));
+      stream.on('finish', () => {
+        resolve(true);
+      });
+    }).catch(err => { console.log(err); resolve(false); });
+  });
+}
 
 const _generateImageFromPdf = (pdfPath) => {
-  return new Promise(resolve => {
+  return new Promise(async (resolve) => {
+    const localPdfDownloaded = await _downloadPdfToLocal(pdfPath);
+
+    if (!localPdfDownloaded) resolve(false);
+
+    // this is probably a vulnerability right here, since it passes an external value
+    // (the file name) into command line, would want to rename the file, strip it, use an alias, something
     const cmd = `${process.env.SERVER_OS === 'windows' ? 'magick convert' : 'convert'} \
-      -density 150 ${pdfPath} -quality 90 ${pdfImgPath}`;
+      -density 150 ${pdfLocalPath} -quality 90 ${pdfImgPath}`;
 
     exec(cmd, function (error, stdout, stderr) {
       if (error) {
@@ -25,10 +50,11 @@ const _generateImageFromPdf = (pdfPath) => {
   });
 }
 
-const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier) => {
+const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier, pdfDimensions) => {
   return new Promise(async (resolve) => {
     if (cropZones.length) {
       const { x, y, width, height, id, xOffset, yOffset } = cropZones[0];
+      const subImageFileName = __dirname + `./screenshots/${id}.jpg`;
 
       sharp(pdfImagePath)
         .extract({
@@ -37,11 +63,12 @@ const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier)
           width: Math.trunc(width * multiplier.x),
           height: Math.trunc(height * multiplier.y)
         })
-        .toFile(__dirname + `./screenshots/${id}.jpg`, function (err) {
+        .toFile(subImageFileName, function (err) {
           if (err) {
             console.log(err);
             resolve(false);
           } else {
+            subImages.push(subImageFileName);
             cropZones.shift();
             _getCroppedImages(cropZones, pdfImagePath, subImages, multiplier, pdfDimensions);
           }
@@ -52,7 +79,7 @@ const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier)
   });
 }
 
-const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones) => {
+const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones, globalSubImages) => {
   return new Promise(async (resolve) => {
     const pdfImagePath = await _generateImageFromPdf(pdfPath, pdfDimensions);
     const subImages = [];
@@ -73,23 +100,13 @@ const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones) => {
       console.log(err);
       resolve([]); // fail all if any fail
     }
+    globalSubImages = subImages; // used for deletion
     resolve(subImages);
   });
 };
 
-// const pdfDimensions = {
-//   width: 921,
-//   height: 1191
-// };
-
-// const cropZones = [
-//  {"id":1656141009979,"x":484,"y":194,"width":162,"height":32,"xOffset":-41.5,"yOffset":-88},
-//  {"id":1656141013693,"x":148,"y":325,"width":172,"height":25,"xOffset":-41.5,"yOffset":-88},
-//  {"id":1656141018211,"x":147,"y":422,"width":177,"height":77,"xOffset":-41.5,"yOffset":-88}
-// ];
-
-// getPdfCropImages(__dirname + './test.pdf', pdfDimensions, cropZones);
-
 module.exports = {
-  getPdfCropImages
+  getPdfCropImages,
+  pdfImgPath,
+  pdfLocalPath
 }

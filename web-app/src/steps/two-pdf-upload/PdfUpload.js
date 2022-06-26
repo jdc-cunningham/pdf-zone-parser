@@ -82,7 +82,7 @@ const PdfUpload = (props) => {
       onDragOver={(e) => dragOverHandler(e)}
       onDragLeave={(e) => dragLeave(e)}
     >
-      {!dragDetected && pdfs.length < 1 && <h1>Drag and drop your PDFs into this window to upload and parse them</h1>}
+      {!dragDetected && pdfs.length < 1 && <h1 style={{textAlign: 'center', width: '100%'}}>Drag and drop your PDFs into this window to upload and parse them</h1>}
       {dragDetected && <h1>Release your mouse click to upload</h1>}
       {pdfs.lenght > 0 && <h2>Uploading...</h2>}
     </div>

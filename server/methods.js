@@ -5,6 +5,8 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
 const { createWorker } = require('tesseract.js');
+const { getPdfCropImages, pdfImgPath, pdfLocalPath} = require('./pdf-screenshot-gen/generator');
+const globalSubImages = [];
 
 const worker = createWorker({
   logger: m => console.log(m)
@@ -250,8 +252,14 @@ const getSignedS3Url = (req, res) => {
   }
 };
 
-const _generateScreenshots = async (pdfUrl, zones) => {
+const _getSignedS3Url = (fileKey) => {
+  const url = s3.getSignedUrl('getObject', {
+    Bucket: bucketName,
+    Key: fileKey,
+    Expires: 3600 // 1 hr
+  });
 
+  return url
 }
 
 const _parsePdfPartialScreenshot = async () => {
@@ -263,11 +271,171 @@ const _parsePdfPartialScreenshot = async () => {
   await worker.terminate();
 }
 
-const _processPdfs = async (reqBody) => {
-  const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
-
-  // need to work out this flow
+// object or boolean? yum
+const _getPdfIdFromFileKey = async () => {
+  return new Promise(resolve => {
+    pool.query(
+      `${'SELECT id, user_id FROM pdf_uploads WHERE file_key = ?'}`,
+      [fileKey],
+      (err, qRes) => {
+        if (err) {
+          resolve(false);
+        } else {
+          resolve(qRes[0]);
+        }
+      }
+    );
+  });
 }
+
+const _updateDBParsedPdf = async (pdfParsedData) => {
+  return new Promise(async (resolve) => {
+    const pdfMeta = await _getPdfIdFromFileKey(fileKey);
+
+    if (pdfMeta?.id) {
+      pool.query(
+        `${'INSERT INTO pdf_parsed_data SET user_id = ?, pdf_id = ?, pdf_data_mapping = ?'}`,
+        [pdfMeta.user_id, pdfMeta.id, JSON.stringify(pdfParsedData)],
+        (err, qRes) => {
+          if (err) {
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        }
+      );
+    } else {
+      resolve(false);
+    }
+  });
+}
+
+const _cleanUpPreviousProcessFiles = async (pdfPath, pdfImgPath, subImagePaths) => {
+  const deletedFiles = [];
+
+  return new Promise(resolve => {
+    fs.unlink(pdfPath, (err => {
+      if (err) console.log(err); // means files will build up
+      deletedFiles.push(pdfPath);
+    }));
+
+    // lazy
+    fs.unlink(pdfImgPath, (err => {
+      if (err) console.log(err); // means files will build up
+      deletedFiles.push(pdfImgPath);
+    }));
+
+    subImagePaths.forEach(path => {
+      fs.unlink(path, (err => {
+        if (err) console.log(err); // means files will build up
+        deletedFiles.push(path);
+      }));
+    })
+
+    // the above are synchronous so should be done here
+    if (deletedFiles.length === 5) {
+      resolve(true);
+    } else {
+      resolve(false);
+    }
+  });
+}
+
+// returns object with parsed data
+const _processPdf = async (filePath, pdfDimensions, cropZones) => {
+  const subImages = await getPdfCropImages(filePath, pdfDimensions, cropZones, globalSubImages);
+  console.log(subImages);
+}
+
+const _clientPing = async () => {
+  return new Promise(resolve => {
+    resolve(true); // for now
+  });
+}
+
+const _processPdfs = async (reqBody) => {
+  return new Promise(async (resolve) => {
+    const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
+
+    if (pdfs.length) {
+      const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
+      const pdfParsedData = await _processPdf(pdfPath, pdfDimensions, zones, zoneColumnMap);
+      const updateDB = await _updateDBParsedPdf(pdfParsedData);
+      const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
+      const cleanUpFiles = await _cleanUpPreviousProcessFiles(pdfLocalPath, pdfImgPath, globalSubImages); // last global param bad
+      await _clientPing((updateDB && writeToGS), pdfs[0].fileName);
+      pdfs.shift();
+      _processPdfs(reqBody);
+    } else {
+      resolve(true);
+    }
+  });
+}
+
+const manualRun = async (reqBody) => {
+  const { insertAtRow, pdfDimensions, pdfs, zoneColumnMap, zones } = reqBody;
+  const pdfPath = _getSignedS3Url(pdfs[0].fileKey);
+  const pdfParsedData = await _processPdf(pdfPath, pdfDimensions, zones, zoneColumnMap);
+  const updateDB = await _updateDBParsedPdf(pdfParsedData);
+  // const writeToGS = await writeToCell(insertAtRow, pdfParsedData);
+  // await _clientPing((updateDB && writeToGS), pdfs[0].fileName);
+  // pdfs.shift();
+  // _processPdfs(reqBody);
+}
+
+const payload = {
+  "pdfs": [
+    {
+      "fileName": "Sample PDF Parsing Target Doc 2.pdf",
+      "fileKey": "2022-06-26_YKw031IhiSymQFMA_samplepdfparsingtargetdoc2.pdf"
+    }
+    // {
+    //   "fileName": "Sample PDF Parsing Target Doc.pdf",
+    //   "fileKey": "2022-06-26_m4WhQ4TTjmmg8Wcx_samplepdfparsingtargetdoc.pdf"
+    // }
+  ],
+  "zones": [
+    {
+      "id": 1656270505732,
+      "x": 505,
+      "y": 195,
+      "width": 172,
+      "height": 39,
+      "xOffset": -64,
+      "yOffset": -88
+    },
+    {
+      "id": 1656270510063,
+      "x": 151,
+      "y": 330,
+      "width": 184,
+      "height": 33,
+      "xOffset": -64,
+      "yOffset": -88
+    },
+    {
+      "id": 1656270514719,
+      "x": 148,
+      "y": 441,
+      "width": 205,
+      "height": 80,
+      "xOffset": -64,
+      "yOffset": -88
+    }
+  ],
+  "zoneColumnMap": {
+    "zone-1656270505732": "A",
+    "zone-1656270510063": "B",
+    "zone-1656270514719": "C"
+  },
+  "pdfDimensions": {
+    "width": 963,
+    "height": 1246
+  },
+  "insertAtRow": "2"
+};
+
+manualRun(payload);
 
 const parsePdfZones = async (req, res) => {
   const processingFinished = await _processPdfs(req.Body);
