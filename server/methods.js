@@ -386,51 +386,51 @@ const manualRun = async (reqBody) => {
 const payload = {
   "pdfs": [
     {
+      "fileName": "Sample PDF Parsing Target Doc.pdf",
+      "fileKey": "2022-06-26_p2x62ezgZ8QvYN4Q_samplepdfparsingtargetdoc.pdf"
+    },
+    {
       "fileName": "Sample PDF Parsing Target Doc 2.pdf",
-      "fileKey": "2022-06-26_YKw031IhiSymQFMA_samplepdfparsingtargetdoc2.pdf"
+      "fileKey": "2022-06-26_46Xu2QHR7PS1bi2P_samplepdfparsingtargetdoc2.pdf"
     }
-    // {
-    //   "fileName": "Sample PDF Parsing Target Doc.pdf",
-    //   "fileKey": "2022-06-26_m4WhQ4TTjmmg8Wcx_samplepdfparsingtargetdoc.pdf"
-    // }
   ],
   "zones": [
     {
-      "id": 1656270505732,
-      "x": 505,
-      "y": 195,
-      "width": 172,
-      "height": 39,
-      "xOffset": -64,
+      "id": 1656276936930,
+      "x": 442,
+      "y": 185,
+      "width": 151,
+      "height": 30,
+      "xOffset": -42,
       "yOffset": -88
     },
     {
-      "id": 1656270510063,
-      "x": 151,
-      "y": 330,
-      "width": 184,
-      "height": 33,
-      "xOffset": -64,
+      "id": 1656276940345,
+      "x": 134,
+      "y": 301,
+      "width": 158,
+      "height": 30,
+      "xOffset": -42,
       "yOffset": -88
     },
     {
-      "id": 1656270514719,
-      "x": 148,
-      "y": 441,
-      "width": 205,
-      "height": 80,
-      "xOffset": -64,
+      "id": 1656276944501,
+      "x": 133,
+      "y": 401,
+      "width": 165,
+      "height": 63,
+      "xOffset": -42,
       "yOffset": -88
     }
   ],
   "zoneColumnMap": {
-    "zone-1656270505732": "A",
-    "zone-1656270510063": "B",
-    "zone-1656270514719": "C"
+    "zone-1656276936930": "A",
+    "zone-1656276940345": "B",
+    "zone-1656276944501": "C"
   },
   "pdfDimensions": {
-    "width": 963,
-    "height": 1246
+    "width": 845,
+    "height": 1093
   },
   "insertAtRow": "2"
 };

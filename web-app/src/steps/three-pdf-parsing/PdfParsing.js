@@ -92,7 +92,7 @@ const PdfParsing = (props) => {
     const xOffset = -1 * ((
       pdfContainer.offsetWidth -
       document.querySelector('.react-pdf__Page__canvas').offsetWidth
-    ) / 2) - 10; // 10 is the scrollbar, should check if visible, should always be due to AR
+    ) / 2) + 5; // problematic, not sure if tied to responsiveness or what, slightly off
 
     const scrollTop = pdfContainer.scrollTop
     const yOffset = -88 + scrollTop;

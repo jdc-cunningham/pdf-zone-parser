@@ -96,12 +96,13 @@ const getPdfCropImages = async (pdfPath, pdfDimensions, cropZones, globalSubImag
 
     try {
       await _getCroppedImages(cropZones, pdfImagePath, subImages, {x: xMultiplier, y: yMultiplier}, pdfDimensions);
+      console.log('await done');
+      globalSubImages = subImages; // used for deletion
+      resolve(subImages);
     } catch (err) {
       console.log(err);
       resolve([]); // fail all if any fail
     }
-    globalSubImages = subImages; // used for deletion
-    resolve(subImages);
   });
 };
 
