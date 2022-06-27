@@ -3,6 +3,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 const exec = require('child_process').exec;
 const axios = require('axios').default;
+const globalSubImages = [];
 
 const _slugifyNoPdf = (text) => text
   .toLowerCase()
@@ -122,7 +123,7 @@ const _dynamicSort = (property) => {
   }
 }
 
-const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages, zoneColumnMap) => {
+const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColumnMap) => {
   return new Promise(async (resolve) => {
     const pdfImagePath = await _generateImageFromPdf(pdfInfo, pdfS3Url);
     const subImages = [];
@@ -168,5 +169,6 @@ const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, glo
 };
 
 module.exports = {
-  getPdfCropImages
+  getPdfCropImages,
+  globalSubImages
 }

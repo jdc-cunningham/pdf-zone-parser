@@ -5,8 +5,7 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
 const { createWorker } = require('tesseract.js');
-const { getPdfCropImages, pdfImgPath, pdfLocalPath} = require('./pdf-screenshot-gen/generator');
-const globalSubImages = [];
+const { getPdfCropImages, globalSubImages } = require('./pdf-screenshot-gen/generator');
 
 AWS.config.update({
   region: process.env.AWS_S3_REGION,
@@ -330,7 +329,7 @@ const _cleanUpPreviousProcessFiles = async (subImagePaths) => {
 
 // returns object with parsed data
 const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColumnMap, insertAtRow, worker, internalCounter) => {
-  const subImages = await getPdfCropImages(pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages, zoneColumnMap);
+  const subImages = await getPdfCropImages(pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColumnMap);
   const subImagesZoneText = {};
   const fileKey = pdfInfo.fileKey;
 
@@ -350,9 +349,6 @@ const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColu
       ? zoneText
       : zoneText.replace(/\n/g, '');
   }
-
-  // remove images
-  await _cleanUpPreviousProcessFiles(globalSubImages);
 
   return {
     fileKey,
@@ -428,6 +424,8 @@ const _processPdfs = async (reqBody) => {
         } else {
           // end OCR
           await worker.terminate();
+          // remove images
+          await _cleanUpPreviousProcessFiles(globalSubImages);
           resolve(true);
         }
       };
