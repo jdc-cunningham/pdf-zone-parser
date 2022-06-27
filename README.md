@@ -1,7 +1,9 @@
-#### Status: incomplete
+#### Status: functional
 
 ### About
 This is a web-based PDF zone-parser that is specifically made to integrate into a google spreadsheet. So each zone parsed goes into some spreadsheet cell.
+
+<img src="./local-demo.gif" width="800"/>
 
 ### How does it work?
 This project uses `ImageMagick` to generate an image from a PDF and then uses `sharp` to make sub images from the zones drawn over a client-rendered PDF preview. The sub images are then passed into `Tesseract.js` to parse the text from the images. Then the parsed text is written out to a Google Spreadsheet.
