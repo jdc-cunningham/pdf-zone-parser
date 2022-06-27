@@ -5,7 +5,7 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
 const { createWorker } = require('tesseract.js');
-const { getPdfCropImages, globalSubImages } = require('./pdf-screenshot-gen/generator');
+const { getPdfCropImages } = require('./pdf-screenshot-gen/generator');
 
 AWS.config.update({
   region: process.env.AWS_S3_REGION,
@@ -259,10 +259,7 @@ const _getSignedS3Url = (fileKey) => {
 
 const _parsePdfPartialScreenshot = async (pdfZoneImagePath, worker) => {
   return new Promise(async (resolve) => {
-    console.log('parse');
-    console.log(pdfZoneImagePath);
     const { data: { text } } = await worker.recognize(pdfZoneImagePath);
-    console.log(text);
     text ? resolve(text.trim()) : resolve('');
   });
 }
@@ -307,14 +304,15 @@ const _updateDBParsedPdf = async (pdfParsedData) => {
   });
 }
 
-const _cleanUpPreviousProcessFiles = async (subImagePaths) => {
+const _cleanUpPreviousProcessFiles = async (zones) => {
   const deletedFiles = [];
 
   return new Promise(resolve => {
-    subImagePaths.forEach(path => {
-      fs.unlink(path, (err => {
+    zones.forEach(zone => {
+      const zoneImgPath = __dirname + `/pdf-screenshot-gen/screenshots/${zone.id}.jpg`;
+      fs.unlink(zoneImgPath, (err => {
         if (err) console.log(err); // means files will build up
-        deletedFiles.push(path);
+        deletedFiles.push(zoneImgPath);
       }));
     })
 
@@ -424,8 +422,8 @@ const _processPdfs = async (reqBody) => {
         } else {
           // end OCR
           await worker.terminate();
-          // remove images
-          await _cleanUpPreviousProcessFiles(globalSubImages);
+          // remove zone images
+          await _cleanUpPreviousProcessFiles(zones);
           resolve(true);
         }
       };

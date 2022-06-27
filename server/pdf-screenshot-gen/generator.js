@@ -3,7 +3,6 @@ const fs = require('fs');
 const sharp = require('sharp');
 const exec = require('child_process').exec;
 const axios = require('axios').default;
-const globalSubImages = [];
 
 const _slugifyNoPdf = (text) => text
   .toLowerCase()
@@ -159,7 +158,6 @@ const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zon
         if (err) console.log(err); // means files will build up
       }));
 
-      globalSubImages = subImages; // used for deletion
       resolve(subImages);
     } catch (err) {
       console.log(err);
@@ -169,6 +167,5 @@ const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zon
 };
 
 module.exports = {
-  getPdfCropImages,
-  globalSubImages
+  getPdfCropImages
 }
