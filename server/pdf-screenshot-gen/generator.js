@@ -54,12 +54,17 @@ const _generateImageFromPdf = (pdfInfo, pdfS3Url) => {
         resolve(false);
       }
 
+      // remove local pdf
+      fs.unlink(pdfLocalPath, (err => {
+        if (err) console.log(err); // means files will build up
+      }));
+
       resolve(pdfImgPath);
     });
   });
 }
 
-const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier, pdfDimensions) => {
+const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier) => {
   return new Promise(async (resolve) => {
     const promises = [];
 
@@ -101,7 +106,23 @@ const _getCroppedImages = async (cropZones, pdfImagePath, subImages, multiplier,
   });
 }
 
-const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages) => {
+// https://stackoverflow.com/a/4760279/2710227
+const _dynamicSort = (property) => {
+  var sortOrder = 1;
+  if(property[0] === "-") {
+      sortOrder = -1;
+      property = property.substr(1);
+  }
+  return function (a,b) {
+      /* next line works with strings and numbers, 
+       * and you may want to customize it to your needs
+       */
+      var result = (a[property] < b[property]) ? -1 : (a[property] > b[property]) ? 1 : 0;
+      return result * sortOrder;
+  }
+}
+
+const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages, zoneColumnMap) => {
   return new Promise(async (resolve) => {
     const pdfImagePath = await _generateImageFromPdf(pdfInfo, pdfS3Url);
     const subImages = [];
@@ -116,8 +137,27 @@ const getPdfCropImages = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, glo
       ? metadata.height / pdfDimensions.height
       : pdfDimensions.height / metadata.height;
 
+    // add the letter mapping
+    const modCropZones = [];
+    
+    cropZones.forEach(zone => {
+      modCropZones.push({
+        ...zone,
+        colLetter: zoneColumnMap[`zone-${zone.id}`]
+      });
+    });
+
+    // sort by col letter
+    modCropZones.sort(_dynamicSort("colLetter"));
+
     try {
-      await _getCroppedImages(cropZones, pdfImagePath, subImages, {x: xMultiplier, y: yMultiplier}, pdfDimensions);
+      await _getCroppedImages(modCropZones, pdfImagePath, subImages, {x: xMultiplier, y: yMultiplier});
+
+      // remove pdf image
+      fs.unlink(pdfImagePath, (err => {
+        if (err) console.log(err); // means files will build up
+      }));
+
       globalSubImages = subImages; // used for deletion
       resolve(subImages);
     } catch (err) {

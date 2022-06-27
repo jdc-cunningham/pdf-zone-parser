@@ -165,6 +165,8 @@ const PdfParsing = (props) => {
       zoneColumnMap[el.getAttribute('id')] = el.value;
     });
 
+    setPdfParsing(true);
+
     axios.post(
       `${process.env.REACT_APP_API_BASE}/parse-pdf-zones`, {
       pdfs: pdfFileKeys,
@@ -178,7 +180,8 @@ const PdfParsing = (props) => {
     })
     .then((res) => {
       if (res.status === 200) {
-        setPdfParsing(true);
+        setPdfParsing(false);
+        alert('Parsing complete'); // depends how many passed in, no callback yet
       } else {
         alert('Failed to start PDF parsing');
       }

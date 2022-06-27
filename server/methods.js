@@ -259,11 +259,13 @@ const _getSignedS3Url = (fileKey) => {
 }
 
 const _parsePdfPartialScreenshot = async (pdfZoneImagePath, worker) => {
-  console.log('img', pdfZoneImagePath);
-  const { data: { text } } = await worker.recognize(pdfZoneImagePath);
-  // await worker.terminate();
-  console.log('txt', text);
-  return text.trim();
+  return new Promise(async (resolve) => {
+    console.log('parse');
+    console.log(pdfZoneImagePath);
+    const { data: { text } } = await worker.recognize(pdfZoneImagePath);
+    console.log(text);
+    text ? resolve(text.trim()) : resolve('');
+  });
 }
 
 // object or boolean? yum
@@ -306,21 +308,10 @@ const _updateDBParsedPdf = async (pdfParsedData) => {
   });
 }
 
-const _cleanUpPreviousProcessFiles = async (pdfPath, pdfImgPath, subImagePaths) => {
+const _cleanUpPreviousProcessFiles = async (subImagePaths) => {
   const deletedFiles = [];
 
   return new Promise(resolve => {
-    fs.unlink(pdfPath, (err => {
-      if (err) console.log(err); // means files will build up
-      deletedFiles.push(pdfPath);
-    }));
-
-    // lazy
-    fs.unlink(pdfImgPath, (err => {
-      if (err) console.log(err); // means files will build up
-      deletedFiles.push(pdfImgPath);
-    }));
-
     subImagePaths.forEach(path => {
       fs.unlink(path, (err => {
         if (err) console.log(err); // means files will build up
@@ -329,7 +320,7 @@ const _cleanUpPreviousProcessFiles = async (pdfPath, pdfImgPath, subImagePaths) 
     })
 
     // the above are synchronous so should be done here
-    if (deletedFiles.length === 5) {
+    if (deletedFiles.length === 3) {
       resolve(true);
     } else {
       resolve(false);
@@ -338,8 +329,8 @@ const _cleanUpPreviousProcessFiles = async (pdfPath, pdfImgPath, subImagePaths) 
 }
 
 // returns object with parsed data
-const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColumnMap, insertAtRow, worker) => {
-  const subImages = await getPdfCropImages(pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages);
+const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColumnMap, insertAtRow, worker, internalCounter) => {
+  const subImages = await getPdfCropImages(pdfInfo, pdfS3Url, pdfDimensions, cropZones, globalSubImages, zoneColumnMap);
   const subImagesZoneText = {};
   const fileKey = pdfInfo.fileKey;
 
@@ -355,12 +346,13 @@ const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColu
     // https://stackoverflow.com/a/4009768/2710227
     const nlCount = (zoneText.match(/\n/g) || []).length;
 
-    subImagesZoneText[`${colLetter}${parseInt(insertAtRow)}`] = nlCount > 1
+    subImagesZoneText[`${colLetter}${parseInt(insertAtRow) + internalCounter}`] = nlCount > 1
       ? zoneText
       : zoneText.replace(/\n/g, '');
   }
 
-  // await worker.terminate();
+  // remove images
+  await _cleanUpPreviousProcessFiles(globalSubImages);
 
   return {
     fileKey,
@@ -368,6 +360,8 @@ const _processPdf = async (pdfInfo, pdfS3Url, pdfDimensions, cropZones, zoneColu
   };
 }
 
+// needs a websocket host setup server side
+// then client has to subscribe to it
 const _clientPing = async () => {
   return new Promise(resolve => {
     resolve(true); // for now
@@ -398,51 +392,47 @@ const _processPdfs = async (reqBody) => {
     if (pdfs.length) {
       const sheetId = await _getSheetId();
       const promises = [];
+      let internalCounter = 0; // this counts on top of "insertAtRow"
 
       // start OCR
       const worker = createWorker({
         langPath: './eng.traineddata',
         // logger: m => console.log(m)
       });
+
       await worker.load();
       await worker.loadLanguage('eng');
       await worker.initialize('eng');
 
-      pdfs.forEach(pdf => {
-        promises.push(
-          new Promise(async (resolve) => {
-            const pdfS3Url = _getSignedS3Url(pdf.fileKey);
-            const pdfParsedData = await _processPdf(pdf, pdfS3Url, pdfDimensions, zones, zoneColumnMap, insertAtRow, worker);
-            const updatedDB = await _updateDBParsedPdf(pdfParsedData);
-            const wroteToGS = await writeDataToSpreadsheet(pdfParsedData, sheetId);
-            // await _cleanUpPreviousProcessFiles(pdfLocalPath, pdfImgPath, globalSubImages); // last global param bad
-            // await _clientPing((updateDB && writeToGS), pdf.fileName); // ws
+      // this internal loop/closure is here because the zones use the same timestamp...
+      // so when the async processes run, there are times when the wrong zone image (belonging to another pdf)
+      // is used, so this forces one PDF to be processed at a time, not great for speed
+      // I briefly tried to fix the zone name but it is tied to other places as well eg. the zoneColumnMap
+      const internalProcessPdf = async (pdfs) => {
+        const pdf = pdfs[0];
+        const pdfS3Url = _getSignedS3Url(pdf.fileKey);
+        const pdfParsedData = await _processPdf(pdf, pdfS3Url, pdfDimensions, zones, zoneColumnMap, insertAtRow, worker, internalCounter);
+        const updatedDB = await _updateDBParsedPdf(pdfParsedData);
+        const wroteToGS = await writeDataToSpreadsheet(pdfParsedData, sheetId);
+        internalCounter += 1;
+        // await _clientPing((updateDB && writeToGS), pdf.fileName); // websocket, no time to build now
 
-            console.log(updatedDB);
-            console.log(wroteToGS);
+        if (!updatedDB || !wroteToGS) {
+          console.log('error occurred'); // means dropped data
+        }
+        
+        pdfs.shift();
 
-            if (!updatedDB || !wroteToGS) {
-              resolve(false);
-            }
+        if (pdfs.length) {
+          await internalProcessPdf(pdfs);
+        } else {
+          // end OCR
+          await worker.terminate();
+          resolve(true);
+        }
+      };
 
-            resolve(true);
-          })
-        );
-      });
-
-      Promise
-      .all(promises)
-      .then(() => {
-        resolve(true);
-      })
-      .catch(err => {
-        console.log(err);
-        resolve(false);
-      })
-      .finally(async () => {
-        // end OCR
-        await worker.terminate();
-      });
+      await internalProcessPdf(pdfs);
     } else {
       resolve(true);
     }

@@ -29,30 +29,27 @@ const writeDataToSpreadsheet = async (data, sheetId) => {
   const authenticated = await authenticate();
   const { subImagesZoneText } = data;
 
-  console.log(authenticated);
-  console.log(subImagesZoneText);
-
   return new Promise(async (resolve) => {
     if (authenticated) {
-      const cells = Object.keys(subImagesZoneText);
+      const cells = Object.keys(subImagesZoneText).sort();
       const first = cells[0];
       const last = cells[cells.length - 1];
       const range = `Sheet1!${first}:${last}`; // very brittle
-      const resource = Object.keys(subImagesZoneText).map(cell => subImagesZoneText[cell]);
-
-      console.log(range);
-      console.log(resource);
+      const resource = cells.map(cell => subImagesZoneText[cell]);
 
       sheets.spreadsheets.values.update({
         auth: jwtClient,
         spreadsheetId: sheetId,
         range,
-        resource,
+        resource: {
+          values: [resource]
+        },
         valueInputOption: 'RAW',
       }, (err, res) => {
         if (err) {
           // handle this err
           console.log(err);
+          resolve(false);
         } else {
           resolve(true);
         }
