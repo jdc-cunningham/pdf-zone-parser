@@ -41,7 +41,7 @@ const _generateImageFromPdf = (pdfInfo, pdfS3Url) => {
     // this is probably a vulnerability right here, since it passes an external value
     // (the file name) into command line, would want to rename the file, strip it, use an alias, something
     const cmd = `${process.env.SERVER_OS === 'windows' ? 'magick convert' : 'convert'} \
-      -density 150 ${pdfLocalPath} -quality 90 ${pdfImgPath}`;
+      -density 150 ${pdfLocalPath}[0] -quality 90 ${pdfImgPath}`;
 
     exec(cmd, function (error, stdout, stderr) {
       if (error) {
